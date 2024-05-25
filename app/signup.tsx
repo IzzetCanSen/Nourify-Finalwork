@@ -10,13 +10,18 @@ import {
   Platform,
 } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/firebaseConfig";
+import { doc, setDoc } from "firebase/firestore";
+import { auth, db } from "@/firebaseConfig";
 import { router } from "expo-router";
+import ProfileSetup from "@/components/ProfileSetup";
+import { FirebaseError } from "firebase/app"; // Import FirebaseError
 
-export default function HomeScreen() {
+export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [keyboardIsShown, setKeyboardIsShown] = useState(false);
+  const [isSignedUp, setIsSignedUp] = useState(false);
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -38,18 +43,36 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const handleSignUp = () => {
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        const user = userCredential.user;
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        console.log(errorCode);
-        console.log(errorMessage);
+  const handleSignUp = async () => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      // Save the username and other profile information to Firestore
+      await setDoc(doc(db, "users", user.uid), {
+        username: username,
+        email: email,
+        createdAt: new Date(),
       });
+
+      setIsSignedUp(true);
+    } catch (error) {
+      // Explicitly type error as FirebaseError
+      if (error instanceof FirebaseError) {
+        console.error("Error signing up:", error.code, error.message);
+      } else {
+        console.error("Unknown error:", error);
+      }
+    }
   };
+
+  if (isSignedUp) {
+    return <ProfileSetup />;
+  }
 
   return (
     <View style={styles.authScreenContainer}>
@@ -64,6 +87,8 @@ export default function HomeScreen() {
             style={styles.input}
             placeholder="Username"
             placeholderTextColor="#fff"
+            value={username}
+            onChangeText={setUsername}
           />
           <TextInput
             style={styles.input}

@@ -13,7 +13,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/firebaseConfig";
 import { router } from "expo-router";
 
-export default function HomeScreen() {
+export default function signinScreen() {
   const [signinEmail, setSigninEmail] = useState("");
   const [signinPassword, setSigninPassword] = useState("");
   const [keyboardIsShown, setKeyboardIsShown] = useState(false);
