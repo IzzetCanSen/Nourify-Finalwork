@@ -3,7 +3,7 @@ import { StyleSheet, View, Text, TouchableOpacity } from "react-native";
 export default function TabTwoScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Progress page</Text>
+      <Text style={styles.title}>Progress page (TODO)</Text>
     </View>
   );
 }

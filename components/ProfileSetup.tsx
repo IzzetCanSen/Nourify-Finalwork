@@ -9,6 +9,7 @@ import {
 import { useAuthState } from "react-firebase-hooks/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/firebaseConfig";
+import { router } from "expo-router";
 
 import Icon from "react-native-vector-icons/MaterialIcons";
 
@@ -137,7 +138,7 @@ const ProfileSetup = () => {
         bodyFat,
         goal,
         activityLevel,
-        adjustedCalories: nutritionTargets.calories,
+        adjustedCalories: nutritionTargets.calories.toFixed(0),
         protein: nutritionTargets.protein,
         carbs: nutritionTargets.carbs,
         fat: nutritionTargets.fat,
@@ -147,6 +148,7 @@ const ProfileSetup = () => {
 
   const handleFinish = async () => {
     await saveProfileData();
+    router.push("(tabs)");
   };
 
   return (
