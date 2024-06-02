@@ -8,10 +8,11 @@ import {
   ActivityIndicator,
 } from "react-native";
 import moment from "moment";
-import { Svg, Circle } from "react-native-svg";
 import MealDetailScreen from "@/components/MealDetailScreen";
-import { auth } from "@/firebaseConfig";
+import { auth, db } from "@/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
+import { collection, doc, getDoc } from "firebase/firestore";
+import Icon from "react-native-vector-icons/MaterialIcons";
 
 type NutrientKey = "CAL" | "PROT" | "CARB" | "FAT";
 
@@ -22,44 +23,7 @@ const nutrientColors: Record<NutrientKey, string> = {
   FAT: "#cc33ff",
 };
 
-const data: Record<NutrientKey, number> = {
-  CAL: 356,
-  PROT: 48,
-  CARB: 59,
-  FAT: 31,
-};
-
-const totalValue = Object.values(data).reduce((sum, value) => sum + value, 0);
-
-const renderPieChart = (nutrient: NutrientKey, value: number) => {
-  const radius = 40;
-  const circumference = 2 * Math.PI * radius;
-  const percentage = value / totalValue;
-  const strokeDashoffset = circumference * (1 - percentage);
-
-  return (
-    <Svg width="85" height="85" viewBox="0 0 85 85">
-      <Circle
-        cx="42.5"
-        cy="42.5"
-        r={radius}
-        stroke={nutrientColors[nutrient]}
-        strokeWidth="5"
-        fill="none"
-        strokeDasharray={circumference.toString()}
-        strokeDashoffset={strokeDashoffset.toString()}
-      />
-      <Circle
-        cx="42.5"
-        cy="42.5"
-        r={radius}
-        stroke="#1F2831"
-        strokeWidth="5"
-        fill="none"
-      />
-    </Svg>
-  );
-};
+const mealsList = ["Breakfast", "Lunch", "Dinner", "Snack"];
 
 export default function TabTwoScreen() {
   const [user, loading, error] = useAuthState(auth);
@@ -69,6 +33,13 @@ export default function TabTwoScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const initialScrollDone = useRef<boolean>(false);
   const [selectedMeal, setSelectedMeal] = useState<string | null>(null);
+  const [mealsData, setMealsData] = useState<any>({});
+  const [totals, setTotals] = useState<Record<NutrientKey, number>>({
+    CAL: 0,
+    PROT: 0,
+    CARB: 0,
+    FAT: 0,
+  });
 
   const startDate = moment().subtract(1, "month");
   const endDate = moment().add(1, "month");
@@ -97,6 +68,59 @@ export default function TabTwoScreen() {
     }
   }, [dates]);
 
+  useEffect(() => {
+    const fetchMealsData = async () => {
+      if (user) {
+        try {
+          const mealLogDocRef = doc(
+            db,
+            "users",
+            user.uid,
+            "mealLogs",
+            selectedDate
+          );
+
+          let fetchedMealsData: any = {};
+          let totalCalories = 0;
+          let totalProtein = 0;
+          let totalCarbs = 0;
+          let totalFat = 0;
+
+          for (let meal of mealsList) {
+            const mealDocRef = doc(mealLogDocRef, "meals", meal);
+            const mealLogDoc = await getDoc(mealDocRef);
+
+            if (mealLogDoc.exists()) {
+              const data = mealLogDoc.data();
+              fetchedMealsData[meal] = data.items || [];
+
+              data.items.forEach((item: any) => {
+                totalCalories += item.calories;
+                totalProtein += item.protein;
+                totalCarbs += item.carbs;
+                totalFat += item.fat;
+              });
+            } else {
+              fetchedMealsData[meal] = [];
+            }
+          }
+
+          setMealsData(fetchedMealsData);
+          setTotals({
+            CAL: totalCalories,
+            PROT: totalProtein,
+            CARB: totalCarbs,
+            FAT: totalFat,
+          });
+        } catch (error) {
+          console.error("Error fetching meals data:", error);
+        }
+      }
+    };
+
+    fetchMealsData();
+  }, [selectedDate, user]);
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -124,6 +148,17 @@ export default function TabTwoScreen() {
     );
   }
 
+  const renderNutrientCircle = (nutrient: NutrientKey, value: number) => (
+    <View
+      style={[styles.nutrientCircle, { borderColor: nutrientColors[nutrient] }]}
+    >
+      <Text style={[styles.nutrientText, { color: nutrientColors[nutrient] }]}>
+        {nutrient}
+      </Text>
+      <Text style={styles.nutrientValue}>{value}</Text>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>MealMap</Text>
@@ -148,25 +183,68 @@ export default function TabTwoScreen() {
       </ScrollView>
       <View style={styles.nutrientCircles}>
         {(["CAL", "PROT", "CARB", "FAT"] as NutrientKey[]).map((nutrient) => (
-          <View key={nutrient} style={styles.nutrientCircle}>
-            {renderPieChart(nutrient, data[nutrient])}
-            <Text style={styles.nutrientText}>{nutrient}</Text>
-            <Text style={styles.nutrientValue}>{data[nutrient]}</Text>
+          <View key={nutrient} style={styles.nutrientCircleContainer}>
+            {renderNutrientCircle(nutrient, totals[nutrient])}
           </View>
         ))}
       </View>
-      <View style={styles.meals}>
-        {["Breakfast", "Lunch", "Dinner", "Snack"].map((meal, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.meal}
-            onPress={() => setSelectedMeal(meal)}
-          >
-            <Text style={styles.mealText}>{meal}</Text>
-            <Text style={styles.plus}>+</Text>
-          </TouchableOpacity>
+      <ScrollView style={styles.mealsContainer}>
+        {mealsList.map((meal) => (
+          <View key={meal} style={styles.mealCard}>
+            <View style={styles.mealHeader}>
+              <Text style={styles.mealTitle}>{meal}</Text>
+              <TouchableOpacity onPress={() => setSelectedMeal(meal)}>
+                <Icon name="more-vert" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.mealItem}>
+              {mealsData[meal]
+                ?.map((item: any) => `${item.amount}g ${item.name}`)
+                .join(", ")}
+            </Text>
+            {mealsData[meal]?.length > 0 && (
+              <View style={styles.mealMacros}>
+                <Text style={[styles.macro, { backgroundColor: "#ff4d4d" }]}>
+                  {Math.round(
+                    mealsData[meal]?.reduce(
+                      (sum: number, item: any) => sum + item.calories,
+                      0
+                    ) || 0
+                  )}{" "}
+                  Cal
+                </Text>
+                <Text style={[styles.macro, { backgroundColor: "#ffcc00" }]}>
+                  {Math.round(
+                    mealsData[meal]?.reduce(
+                      (sum: number, item: any) => sum + item.protein,
+                      0
+                    ) || 0
+                  )}{" "}
+                  Prot
+                </Text>
+                <Text style={[styles.macro, { backgroundColor: "#4dff4d" }]}>
+                  {Math.round(
+                    mealsData[meal]?.reduce(
+                      (sum: number, item: any) => sum + item.carbs,
+                      0
+                    ) || 0
+                  )}{" "}
+                  Carb
+                </Text>
+                <Text style={[styles.macro, { backgroundColor: "#cc33ff" }]}>
+                  {Math.round(
+                    mealsData[meal]?.reduce(
+                      (sum: number, item: any) => sum + item.fat,
+                      0
+                    ) || 0
+                  )}{" "}
+                  Fat
+                </Text>
+              </View>
+            )}
+          </View>
         ))}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -186,6 +264,7 @@ const styles = StyleSheet.create({
   },
   dateNav: {
     flexDirection: "row",
+    minHeight: 80,
     maxHeight: 80,
     backgroundColor: "#1F2831",
     borderRadius: 15,
@@ -217,42 +296,63 @@ const styles = StyleSheet.create({
   nutrientCircles: {
     flexDirection: "row",
     justifyContent: "space-around",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  nutrientCircleContainer: {
+    alignItems: "center",
+    justifyContent: "center",
   },
   nutrientCircle: {
+    width: 85,
+    height: 85,
+    borderRadius: 42.5,
+    borderWidth: 3,
     alignItems: "center",
     justifyContent: "center",
   },
   nutrientText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-    position: "absolute",
-    top: "40%",
   },
   nutrientValue: {
     color: "#fff",
     fontSize: 13,
-    position: "absolute",
-    bottom: "30%",
   },
-  meals: {
-    justifyContent: "center",
+  mealsContainer: {
+    marginTop: 20,
   },
-  meal: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 20,
+  mealCard: {
     backgroundColor: "#1F2831",
     borderRadius: 10,
+    padding: 15,
     marginBottom: 10,
   },
-  mealText: {
-    color: "#fff",
-    fontSize: 18,
+  mealHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  plus: {
+  mealTitle: {
     color: "#fff",
     fontSize: 18,
+    fontWeight: "bold",
+  },
+  mealItem: {
+    color: "#fff",
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  mealMacros: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  macro: {
+    padding: 5,
+    borderRadius: 5,
+    color: "#fff",
+    fontSize: 14,
   },
   errorText: {
     color: "#ff4d4d",

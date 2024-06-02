@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -9,9 +9,25 @@ import {
   ActivityIndicator,
 } from "react-native";
 import axios from "axios";
-import { collection, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { db } from "@/firebaseConfig";
+
+interface FoodItem {
+  name: string;
+  amount: number;
+  calories: number;
+  carbs: number;
+  fat: number;
+  protein: number;
+}
 
 type MealDetailScreenProps = {
   meal: string;
@@ -29,10 +45,29 @@ export default function MealDetailScreen({
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
   const [editing, setEditing] = useState(false);
-  const [amount, setAmount] = useState<number | null>(null);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
+  const [showMenu, setShowMenu] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchExistingItems = async () => {
+      try {
+        const mealLogDocRef = doc(db, "users", userId, "mealLogs", date);
+        const mealDocRef = doc(mealLogDocRef, "meals", meal);
+        const mealDocSnapshot = await getDoc(mealDocRef);
+
+        if (mealDocSnapshot.exists()) {
+          const existingItems = mealDocSnapshot.data().items || [];
+          setSelectedItems(existingItems);
+        }
+      } catch (error) {
+        console.error("Error fetching existing meal log:", error);
+      }
+    };
+
+    fetchExistingItems();
+  }, [userId, date, meal]);
 
   const searchFood = async () => {
     if (search.trim() === "") {
@@ -59,24 +94,78 @@ export default function MealDetailScreen({
   };
 
   const handleSelectItem = (item: any) => {
-    setSelectedItems((prev) => [...prev, { ...item, amount: 100 }]);
+    const amount = 100;
+    const selectedItem: FoodItem = {
+      name: item.name,
+      amount,
+      calories: (item.calories * amount) / 100,
+      carbs: (item.carbohydrates_total_g * amount) / 100,
+      fat: (item.fat_total_g * amount) / 100,
+      protein: (item.protein_g * amount) / 100,
+    };
+    setSelectedItems((prev) => {
+      const existingItemIndex = prev.findIndex(
+        (i) => i.name === selectedItem.name
+      );
+      if (existingItemIndex > -1) {
+        const updatedItems = [...prev];
+        updatedItems[existingItemIndex] = selectedItem;
+        return updatedItems;
+      }
+      return [...prev, selectedItem];
+    });
   };
 
   const handleEditAmount = (increment: boolean) => {
     if (editingItem) {
       setSelectedItems((prev) =>
-        prev.map((item) =>
-          item.name === editingItem.name
-            ? { ...item, amount: item.amount + (increment ? 10 : -10) }
-            : item
-        )
+        prev.map((item) => {
+          if (item.name === editingItem.name) {
+            const newAmount = item.amount + (increment ? 10 : -10);
+            return {
+              ...item,
+              amount: newAmount,
+              calories: (editingItem.calories * newAmount) / editingItem.amount,
+              carbs: (editingItem.carbs * newAmount) / editingItem.amount,
+              fat: (editingItem.fat * newAmount) / editingItem.amount,
+              protein: (editingItem.protein * newAmount) / editingItem.amount,
+            };
+          }
+          return item;
+        })
       );
     }
   };
 
-  const handleStartEditing = (item: any) => {
+  const handleStartEditing = (item: FoodItem) => {
     setEditingItem(item);
     setEditing(true);
+  };
+
+  const handleDeleteItem = async (item: FoodItem) => {
+    setSelectedItems((prev) => prev.filter((i) => i.name !== item.name));
+
+    try {
+      const mealLogDocRef = doc(db, "users", userId, "mealLogs", date);
+      const mealDocRef = doc(mealLogDocRef, "meals", meal);
+
+      const mealDocSnapshot = await getDoc(mealDocRef);
+      if (mealDocSnapshot.exists()) {
+        const existingItems = mealDocSnapshot.data().items || [];
+        const updatedItems = existingItems.filter(
+          (i: FoodItem) => i.name !== item.name
+        );
+
+        await setDoc(mealDocRef, {
+          items: updatedItems,
+          updatedAt: serverTimestamp(),
+        });
+
+        console.log("Item deleted successfully from Firestore!");
+      }
+    } catch (error) {
+      console.error("Error deleting item from Firestore:", error);
+    }
   };
 
   const handleSaveEditing = () => {
@@ -86,13 +175,8 @@ export default function MealDetailScreen({
 
   const saveMealLog = async () => {
     try {
-      const mealLogDocRef = doc(
-        collection(db, "users", userId, "mealLogs"),
-        date
-      );
-
-      const mealsCollectionRef = collection(mealLogDocRef, "meals");
-      const mealDocRef = doc(mealsCollectionRef, meal);
+      const mealLogDocRef = doc(db, "users", userId, "mealLogs", date);
+      const mealDocRef = doc(mealLogDocRef, "meals", meal);
 
       await setDoc(mealDocRef, {
         items: selectedItems,
@@ -154,55 +238,69 @@ export default function MealDetailScreen({
           <View style={styles.selectedItem}>
             <View style={styles.itemHeader}>
               <Text style={styles.itemTitle}>{item.name}</Text>
-              {editing && editingItem?.name === item.name ? (
-                <>
-                  <TouchableOpacity
-                    onPress={() => handleEditAmount(false)}
-                    style={styles.editButton}
-                  >
-                    <Text style={styles.editButtonText}>-</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.itemAmount}>{item.amount}g</Text>
-                  <TouchableOpacity
-                    onPress={() => handleEditAmount(true)}
-                    style={styles.editButton}
-                  >
-                    <Text style={styles.editButtonText}>+</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleSaveEditing}
-                    style={styles.checkButton}
-                  >
-                    <Text style={styles.checkButtonText}>✓</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.itemAmount}>{item.amount}g</Text>
+              <TouchableOpacity
+                onPress={() => setShowMenu(item.name)}
+                style={styles.moreButton}
+              >
+                <Icon name="more-vert" size={24} color="#fff" />
+              </TouchableOpacity>
+              {showMenu === item.name && (
+                <View style={styles.menu}>
                   <TouchableOpacity
                     onPress={() => handleStartEditing(item)}
-                    style={styles.editButton}
+                    style={styles.menuItem}
                   >
-                    <Text style={styles.editButtonText}>✏️</Text>
+                    <Icon name="edit" size={24} color="#fff" />
+                    <Text style={styles.menuItemText}>Edit</Text>
                   </TouchableOpacity>
-                </>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteItem(item)}
+                    style={styles.menuItem}
+                  >
+                    <Icon name="delete" size={24} color="#fff" />
+                    <Text style={styles.menuItemText}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
-            <View style={styles.macros}>
-              <Text style={[styles.macro, { backgroundColor: "#ff4d4d" }]}>
-                {Math.round((item.calories * item.amount) / 100)} Cal
-              </Text>
-              <Text style={[styles.macro, { backgroundColor: "#ffcc00" }]}>
-                {Math.round((item.protein_g * item.amount) / 100)} Prot
-              </Text>
-              <Text style={[styles.macro, { backgroundColor: "#4dff4d" }]}>
-                {Math.round((item.carbohydrates_total_g * item.amount) / 100)}{" "}
-                Carb
-              </Text>
-              <Text style={[styles.macro, { backgroundColor: "#cc33ff" }]}>
-                {Math.round((item.fat_total_g * item.amount) / 100)} Fat
-              </Text>
-            </View>
+            {editing && editingItem?.name === item.name ? (
+              <View style={styles.editContainer}>
+                <TouchableOpacity
+                  onPress={() => handleEditAmount(false)}
+                  style={styles.editButton}
+                >
+                  <Icon name="do-disturb-on" size={24} color="#fff" />
+                </TouchableOpacity>
+                <Text style={styles.itemAmount}>{item.amount}g</Text>
+                <TouchableOpacity
+                  onPress={() => handleEditAmount(true)}
+                  style={styles.editButton}
+                >
+                  <Icon name="add-circle" size={24} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSaveEditing}
+                  style={styles.checkButton}
+                >
+                  <Text style={styles.checkButtonText}>✓</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.macros}>
+                <Text style={[styles.macro, { backgroundColor: "#ff4d4d" }]}>
+                  {Math.round(item.calories)} Cal
+                </Text>
+                <Text style={[styles.macro, { backgroundColor: "#ffcc00" }]}>
+                  {Math.round(item.protein)} Prot
+                </Text>
+                <Text style={[styles.macro, { backgroundColor: "#4dff4d" }]}>
+                  {Math.round(item.carbs)} Carb
+                </Text>
+                <Text style={[styles.macro, { backgroundColor: "#cc33ff" }]}>
+                  {Math.round(item.fat)} Fat
+                </Text>
+              </View>
+            )}
           </View>
         )}
         ListEmptyComponent={
@@ -296,15 +394,36 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
   },
+  moreButton: {
+    padding: 5,
+  },
+  menu: {
+    position: "absolute",
+    right: 0,
+    top: 24,
+    backgroundColor: "#1F2831",
+    borderRadius: 10,
+    overflow: "hidden",
+    zIndex: 1,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+  },
+  menuItemText: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  editContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 10,
+  },
   editButton: {
     padding: 5,
-    borderRadius: 5,
-    backgroundColor: "#3FA1CA",
-    marginHorizontal: 5,
-  },
-  editButtonText: {
-    color: "#fff",
-    fontSize: 18,
   },
   checkButton: {
     padding: 5,
