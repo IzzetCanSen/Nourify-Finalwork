@@ -5,9 +5,13 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import moment from "moment";
-import { Svg, Circle, G } from "react-native-svg";
+import { Svg, Circle } from "react-native-svg";
+import MealDetailScreen from "@/components/MealDetailScreen";
+import { auth } from "@/firebaseConfig";
+import { useAuthState } from "react-firebase-hooks/auth";
 
 type NutrientKey = "CAL" | "PROT" | "CARB" | "FAT";
 
@@ -58,38 +62,67 @@ const renderPieChart = (nutrient: NutrientKey, value: number) => {
 };
 
 export default function TabTwoScreen() {
+  const [user, loading, error] = useAuthState(auth);
   const [selectedDate, setSelectedDate] = useState<string>(
-    moment().format("DD/MM")
+    moment().format("YYYY-MM-DD")
   );
   const scrollViewRef = useRef<ScrollView>(null);
   const initialScrollDone = useRef<boolean>(false);
+  const [selectedMeal, setSelectedMeal] = useState<string | null>(null);
 
-  // Generate dates from one month before today to one month after today
   const startDate = moment().subtract(1, "month");
   const endDate = moment().add(1, "month");
   const dates: { day: string; date: string }[] = [];
 
   for (let date = startDate; date <= endDate; date.add(1, "day")) {
-    dates.push({ day: date.format("ddd"), date: date.clone().format("DD/MM") });
+    dates.push({
+      day: date.format("ddd"),
+      date: date.clone().format("YYYY-MM-DD"),
+    });
   }
 
-  // Scroll to today's date when the component mounts
   useEffect(() => {
     if (!initialScrollDone.current) {
       const todayIndex = dates.findIndex(
-        (date) => date.date === moment().format("DD/MM")
+        (date) => date.date === moment().format("YYYY-MM-DD")
       );
       if (scrollViewRef.current) {
-        // Assuming each date item has a fixed width
-        const dateItemWidth = 85; // Adjust this width based on your design
+        const dateItemWidth = 85;
         scrollViewRef.current.scrollTo({
           x: todayIndex * dateItemWidth,
           animated: true,
         });
-        initialScrollDone.current = true; // Set the flag to true after the initial scroll
+        initialScrollDone.current = true;
       }
     }
   }, [dates]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#3FA1CA" />
+      </View>
+    );
+  }
+
+  if (error || !user) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Failed to load user data.</Text>
+      </View>
+    );
+  }
+
+  if (selectedMeal) {
+    return (
+      <MealDetailScreen
+        meal={selectedMeal}
+        onBack={() => setSelectedMeal(null)}
+        date={selectedDate}
+        userId={user.uid}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -124,7 +157,11 @@ export default function TabTwoScreen() {
       </View>
       <View style={styles.meals}>
         {["Breakfast", "Lunch", "Dinner", "Snack"].map((meal, index) => (
-          <TouchableOpacity key={index} style={styles.meal}>
+          <TouchableOpacity
+            key={index}
+            style={styles.meal}
+            onPress={() => setSelectedMeal(meal)}
+          >
             <Text style={styles.mealText}>{meal}</Text>
             <Text style={styles.plus}>+</Text>
           </TouchableOpacity>
@@ -216,5 +253,11 @@ const styles = StyleSheet.create({
   plus: {
     color: "#fff",
     fontSize: 18,
+  },
+  errorText: {
+    color: "#ff4d4d",
+    fontSize: 18,
+    textAlign: "center",
+    marginTop: 20,
   },
 });
