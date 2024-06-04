@@ -20,6 +20,8 @@
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
     "expo": "~51.0.2",
+    "expo-barcode-scanner": "^13.0.1",
+    "expo-camera": "~15.0.10",
     "expo-constants": "~16.0.1",
     "expo-font": "~12.0.4",
     "expo-linking": "~6.3.1",

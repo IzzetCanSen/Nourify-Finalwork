@@ -9,16 +9,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import axios from "axios";
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { db } from "@/firebaseConfig";
+import BarcodeScanner from "./BarcodeScanner"; // Import the new component
 
 interface FoodItem {
   name: string;
@@ -43,12 +37,13 @@ export default function MealDetailScreen({
   date,
 }: MealDetailScreenProps) {
   const [search, setSearch] = useState("");
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
   const [editing, setEditing] = useState(false);
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false); // State to manage scanning mode
 
   useEffect(() => {
     const fetchExistingItems = async () => {
@@ -95,14 +90,17 @@ export default function MealDetailScreen({
 
   const handleSelectItem = (item: any) => {
     const amount = 100;
+    console.log(`item:`);
+    console.log(item);
     const selectedItem: FoodItem = {
       name: item.name,
       amount,
       calories: (item.calories * amount) / 100,
-      carbs: (item.carbohydrates_total_g * amount) / 100,
-      fat: (item.fat_total_g * amount) / 100,
-      protein: (item.protein_g * amount) / 100,
+      carbs: (item.carbs * amount) / 100,
+      fat: (item.fat * amount) / 100,
+      protein: (item.protein * amount) / 100,
     };
+    console.log(selectedItem);
     setSelectedItems((prev) => {
       const existingItemIndex = prev.findIndex(
         (i) => i.name === selectedItem.name
@@ -189,129 +187,154 @@ export default function MealDetailScreen({
     }
   };
 
+  const handleScan = (product: FoodItem) => {
+    setResults((prev) => [...prev, product]);
+    setScanning(false);
+  };
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
-          <Icon name="arrow-back" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.title}>{meal}</Text>
-      </View>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Scan meal</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Scan barcode</Text>
-        </TouchableOpacity>
-      </View>
-      <TextInput
-        style={styles.search}
-        placeholder="Search"
-        placeholderTextColor="#fff"
-        value={search}
-        onChangeText={setSearch}
-        onSubmitEditing={searchFood}
-      />
-      {loading && <ActivityIndicator size="large" color="#3FA1CA" />}
-      <FlatList
-        data={results}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            onPress={() => handleSelectItem(item)}
-            style={styles.resultItem}
-          >
-            <Text style={styles.resultText}>{item.name}</Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <Text style={styles.noResults}>No results found</Text>
-          ) : null
-        }
-      />
-      <FlatList
-        data={selectedItems}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.selectedItem}>
-            <View style={styles.itemHeader}>
-              <Text style={styles.itemTitle}>{item.name}</Text>
+      {scanning ? (
+        <BarcodeScanner
+          onScan={handleScan}
+          onCancel={() => setScanning(false)}
+        />
+      ) : (
+        <>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onBack}>
+              <Icon name="arrow-back" size={24} color="#fff" />
+            </TouchableOpacity>
+            <Text style={styles.title}>{meal}</Text>
+          </View>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.button}>
+              <Text style={styles.buttonText}>Scan meal</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setScanning(true)}
+            >
+              <Text style={styles.buttonText}>Scan barcode</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.search}
+            placeholder="Search"
+            placeholderTextColor="#fff"
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={searchFood}
+          />
+          {loading && <ActivityIndicator size="large" color="#3FA1CA" />}
+          <FlatList
+            data={results}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
               <TouchableOpacity
-                onPress={() => setShowMenu(item.name)}
-                style={styles.moreButton}
+                onPress={() => handleSelectItem(item)}
+                style={styles.resultItem}
               >
-                <Icon name="more-vert" size={24} color="#fff" />
+                <Text style={styles.resultText}>{item.name}</Text>
               </TouchableOpacity>
-              {showMenu === item.name && (
-                <View style={styles.menu}>
+            )}
+            ListEmptyComponent={
+              !loading ? (
+                <Text style={styles.noResults}>No results found</Text>
+              ) : null
+            }
+          />
+          <FlatList
+            data={selectedItems}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.selectedItem}>
+                <View style={styles.itemHeader}>
+                  <Text style={styles.itemTitle}>{item.name}</Text>
                   <TouchableOpacity
-                    onPress={() => handleStartEditing(item)}
-                    style={styles.menuItem}
+                    onPress={() => setShowMenu(item.name)}
+                    style={styles.moreButton}
                   >
-                    <Icon name="edit" size={24} color="#fff" />
-                    <Text style={styles.menuItemText}>Edit</Text>
+                    <Icon name="more-vert" size={24} color="#fff" />
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDeleteItem(item)}
-                    style={styles.menuItem}
-                  >
-                    <Icon name="delete" size={24} color="#fff" />
-                    <Text style={styles.menuItemText}>Delete</Text>
-                  </TouchableOpacity>
+                  {showMenu === item.name && (
+                    <View style={styles.menu}>
+                      <TouchableOpacity
+                        onPress={() => handleStartEditing(item)}
+                        style={styles.menuItem}
+                      >
+                        <Icon name="edit" size={24} color="#fff" />
+                        <Text style={styles.menuItemText}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteItem(item)}
+                        style={styles.menuItem}
+                      >
+                        <Icon name="delete" size={24} color="#fff" />
+                        <Text style={styles.menuItemText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            {editing && editingItem?.name === item.name ? (
-              <View style={styles.editContainer}>
-                <TouchableOpacity
-                  onPress={() => handleEditAmount(false)}
-                  style={styles.editButton}
-                >
-                  <Icon name="do-disturb-on" size={24} color="#fff" />
-                </TouchableOpacity>
-                <Text style={styles.itemAmount}>{item.amount}g</Text>
-                <TouchableOpacity
-                  onPress={() => handleEditAmount(true)}
-                  style={styles.editButton}
-                >
-                  <Icon name="add-circle" size={24} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSaveEditing}
-                  style={styles.checkButton}
-                >
-                  <Text style={styles.checkButtonText}>✓</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.macros}>
-                <Text style={[styles.macro, { backgroundColor: "#ff4d4d" }]}>
-                  {Math.round(item.calories)} Cal
-                </Text>
-                <Text style={[styles.macro, { backgroundColor: "#ffcc00" }]}>
-                  {Math.round(item.protein)} Prot
-                </Text>
-                <Text style={[styles.macro, { backgroundColor: "#4dff4d" }]}>
-                  {Math.round(item.carbs)} Carb
-                </Text>
-                <Text style={[styles.macro, { backgroundColor: "#cc33ff" }]}>
-                  {Math.round(item.fat)} Fat
-                </Text>
+                {editing && editingItem?.name === item.name ? (
+                  <View style={styles.editContainer}>
+                    <TouchableOpacity
+                      onPress={() => handleEditAmount(false)}
+                      style={styles.editButton}
+                    >
+                      <Icon name="do-disturb-on" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={styles.itemAmount}>{item.amount}g</Text>
+                    <TouchableOpacity
+                      onPress={() => handleEditAmount(true)}
+                      style={styles.editButton}
+                    >
+                      <Icon name="add-circle" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleSaveEditing}
+                      style={styles.checkButton}
+                    >
+                      <Text style={styles.checkButtonText}>✓</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.macros}>
+                    <Text
+                      style={[styles.macro, { backgroundColor: "#ff4d4d" }]}
+                    >
+                      {Math.round(item.calories)} Cal
+                    </Text>
+                    <Text
+                      style={[styles.macro, { backgroundColor: "#ffcc00" }]}
+                    >
+                      {Math.round(item.protein)} Prot
+                    </Text>
+                    <Text
+                      style={[styles.macro, { backgroundColor: "#4dff4d" }]}
+                    >
+                      {Math.round(item.carbs)} Carb
+                    </Text>
+                    <Text
+                      style={[styles.macro, { backgroundColor: "#cc33ff" }]}
+                    >
+                      {Math.round(item.fat)} Fat
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
-          </View>
-        )}
-        ListEmptyComponent={
-          !loading ? (
-            <Text style={styles.noResults}>No selected items</Text>
-          ) : null
-        }
-      />
-      <TouchableOpacity onPress={saveMealLog} style={styles.saveButton}>
-        <Text style={styles.saveButtonText}>Save</Text>
-      </TouchableOpacity>
+            ListEmptyComponent={
+              !loading ? (
+                <Text style={styles.noResults}>No selected items</Text>
+              ) : null
+            }
+          />
+          <TouchableOpacity onPress={saveMealLog} style={styles.saveButton}>
+            <Text style={styles.saveButtonText}>Save</Text>
+          </TouchableOpacity>
+        </>
+      )}
     </View>
   );
 }
