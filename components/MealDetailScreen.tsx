@@ -12,7 +12,8 @@ import axios from "axios";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { db } from "@/firebaseConfig";
-import BarcodeScanner from "./BarcodeScanner"; // Import the new component
+import BarcodeScanner from "./BarcodeScanner";
+import MealScanner from "./MealScanner";
 
 interface FoodItem {
   name: string;
@@ -38,12 +39,14 @@ export default function MealDetailScreen({
 }: MealDetailScreenProps) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<FoodItem[]>([]);
+  const [scannedResults, setScannedResults] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
   const [editing, setEditing] = useState(false);
   const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [showMenu, setShowMenu] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false); // State to manage scanning mode
+  const [scanning, setScanning] = useState(false);
+  const [scanningMeal, setScanningMeal] = useState(false);
 
   useEffect(() => {
     const fetchExistingItems = async () => {
@@ -80,6 +83,7 @@ export default function MealDetailScreen({
           },
         }
       );
+      console.log(response.data.items);
       setResults(response.data.items);
     } catch (error) {
       console.error("Error fetching data from API:", error);
@@ -88,19 +92,47 @@ export default function MealDetailScreen({
     }
   };
 
-  const handleSelectItem = (item: any) => {
+  const handleSelectItem = async (item: any, source: "barcode" | "api") => {
     const amount = 100;
-    console.log(`item:`);
-    console.log(item);
-    const selectedItem: FoodItem = {
-      name: item.name,
-      amount,
-      calories: (item.calories * amount) / 100,
-      carbs: (item.carbs * amount) / 100,
-      fat: (item.fat * amount) / 100,
-      protein: (item.protein * amount) / 100,
-    };
-    console.log(selectedItem);
+    let selectedItem: FoodItem;
+
+    if (source === "barcode") {
+      selectedItem = {
+        name: item.name,
+        amount,
+        calories: (item.calories * amount) / 100,
+        carbs: (item.carbs * amount) / 100,
+        fat: (item.fat * amount) / 100,
+        protein: (item.protein * amount) / 100,
+      };
+    } else {
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          "https://api.calorieninjas.com/v1/nutrition",
+          {
+            params: { query: item.name },
+            headers: {
+              "X-Api-Key": process.env.EXPO_PUBLIC_CALORIENINJAS_API_KEY,
+            },
+          }
+        );
+        const fetchedItem = response.data.items[0];
+        selectedItem = {
+          name: fetchedItem.name,
+          amount,
+          calories: (fetchedItem.calories * amount) / 100,
+          carbs: (fetchedItem.carbohydrates_total_g * amount) / 100,
+          fat: (fetchedItem.fat_total_g * amount) / 100,
+          protein: (fetchedItem.protein_g * amount) / 100,
+        };
+      } catch (error) {
+        console.error("Error fetching data from API:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
     setSelectedItems((prev) => {
       const existingItemIndex = prev.findIndex(
         (i) => i.name === selectedItem.name
@@ -188,13 +220,31 @@ export default function MealDetailScreen({
   };
 
   const handleScan = (product: FoodItem) => {
-    setResults((prev) => [...prev, product]);
+    setScannedResults((prev) => [...prev, product]);
     setScanning(false);
+  };
+
+  const handleMealScan = (foodItems: string[]) => {
+    const scannedItems = foodItems.map((name) => ({
+      name,
+      amount: 100,
+      calories: 0,
+      carbs: 0,
+      fat: 0,
+      protein: 0,
+    }));
+    setResults((prev) => [...prev, ...scannedItems]);
+    setScanningMeal(false);
   };
 
   return (
     <View style={styles.container}>
-      {scanning ? (
+      {scanningMeal ? (
+        <MealScanner
+          onScan={handleMealScan}
+          onCancel={() => setScanningMeal(false)}
+        />
+      ) : scanning ? (
         <BarcodeScanner
           onScan={handleScan}
           onCancel={() => setScanning(false)}
@@ -208,7 +258,10 @@ export default function MealDetailScreen({
             <Text style={styles.title}>{meal}</Text>
           </View>
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.button}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => setScanningMeal(true)}
+            >
               <Text style={styles.buttonText}>Scan meal</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -228,11 +281,15 @@ export default function MealDetailScreen({
           />
           {loading && <ActivityIndicator size="large" color="#3FA1CA" />}
           <FlatList
-            data={results}
+            data={[...results, ...scannedResults]}
             keyExtractor={(item, index) => index.toString()}
             renderItem={({ item }) => (
               <TouchableOpacity
-                onPress={() => handleSelectItem(item)}
+                onPress={() =>
+                  scannedResults.includes(item)
+                    ? handleSelectItem(item, "barcode")
+                    : handleSelectItem(item, "api")
+                }
                 style={styles.resultItem}
               >
                 <Text style={styles.resultText}>{item.name}</Text>
