@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { CameraType, useCameraPermissions, CameraView } from "expo-camera";
 import axios from "axios";
+import Icon2 from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface FoodItem {
   name: string;
@@ -116,11 +117,12 @@ export default function MealScanner({ onScan, onCancel }: MealScannerProps) {
         <ActivityIndicator size="large" color="#fff" style={styles.loading} />
       )}
       <View style={styles.buttonContainer}>
-        <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
         <TouchableOpacity onPress={handleCapture} style={styles.captureButton}>
-          <Text style={styles.captureButtonText}>Capture</Text>
+          <Icon2 name="camera" size={30} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
+          {/* <Text style={styles.cancelButtonText}>Cancel</Text> */}
+          <Icon2 name="cancel" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </View>
@@ -130,38 +132,38 @@ export default function MealScanner({ onScan, onCancel }: MealScannerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
     backgroundColor: "#222E3A",
   },
   camera: {
     flex: 1,
-    width: "100%",
   },
   loading: {
     position: "absolute",
   },
   buttonContainer: {
+    width: "62%",
     position: "absolute",
-    bottom: 50,
+    right: 8,
+    bottom: 30,
     flexDirection: "row",
     justifyContent: "space-between",
-    width: "100%",
+    alignItems: "center",
     paddingHorizontal: 20,
+    gap: 10,
   },
   cancelButton: {
-    backgroundColor: "#3FA1CA",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "rgba(200, 0, 0, 0.6)",
+    padding: 10,
+    borderRadius: 50,
   },
   cancelButtonText: {
     color: "#fff",
     fontSize: 16,
   },
   captureButton: {
-    backgroundColor: "#3FA1CA",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    padding: 20,
+    borderRadius: 50,
   },
   captureButtonText: {
     color: "#fff",

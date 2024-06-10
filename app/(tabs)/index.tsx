@@ -17,10 +17,10 @@ import Icon from "react-native-vector-icons/MaterialIcons";
 type NutrientKey = "CAL" | "PROT" | "CARB" | "FAT";
 
 const nutrientColors: Record<NutrientKey, string> = {
-  CAL: "#ff4d4d",
-  PROT: "#4dff4d",
-  CARB: "#ffcc00",
-  FAT: "#cc33ff",
+  CAL: "#EE5858",
+  PROT: "#72F584",
+  CARB: "#F9C75C",
+  FAT: "#EE81FA",
 };
 
 const mealsList = ["Breakfast", "Lunch", "Dinner", "Snack"];
@@ -40,20 +40,22 @@ export default function TabTwoScreen() {
     CARB: 0,
     FAT: 0,
   });
+  const [isLoadingMeals, setIsLoadingMeals] = useState<boolean>(true);
 
   const startDate = moment().subtract(1, "month");
   const endDate = moment().add(1, "month");
-  const dates: { day: string; date: string }[] = [];
+  const dates: { day: string; date: string; displayDate: string }[] = [];
 
   for (let date = startDate; date <= endDate; date.add(1, "day")) {
     dates.push({
       day: date.format("ddd"),
       date: date.clone().format("YYYY-MM-DD"),
+      displayDate: date.clone().format("DD/MM"),
     });
   }
 
   useEffect(() => {
-    if (!initialScrollDone.current) {
+    if (!initialScrollDone.current || selectedMeal === null) {
       const todayIndex = dates.findIndex(
         (date) => date.date === moment().format("YYYY-MM-DD")
       );
@@ -66,58 +68,60 @@ export default function TabTwoScreen() {
         initialScrollDone.current = true;
       }
     }
-  }, [dates]);
+  }, [dates, selectedMeal]);
+
+  const fetchMealsData = async () => {
+    setIsLoadingMeals(true);
+    if (user) {
+      try {
+        const mealLogDocRef = doc(
+          db,
+          "users",
+          user.uid,
+          "mealLogs",
+          selectedDate
+        );
+
+        let fetchedMealsData: any = {};
+        let totalCalories = 0;
+        let totalProtein = 0;
+        let totalCarbs = 0;
+        let totalFat = 0;
+
+        for (let meal of mealsList) {
+          const mealDocRef = doc(mealLogDocRef, "meals", meal);
+          const mealLogDoc = await getDoc(mealDocRef);
+
+          if (mealLogDoc.exists()) {
+            const data = mealLogDoc.data();
+            fetchedMealsData[meal] = data.items || [];
+
+            data.items.forEach((item: any) => {
+              totalCalories += item.calories;
+              totalProtein += item.protein;
+              totalCarbs += item.carbs;
+              totalFat += item.fat;
+            });
+          } else {
+            fetchedMealsData[meal] = [];
+          }
+        }
+
+        setMealsData(fetchedMealsData);
+        setTotals({
+          CAL: totalCalories,
+          PROT: totalProtein,
+          CARB: totalCarbs,
+          FAT: totalFat,
+        });
+      } catch (error) {
+        console.error("Error fetching meals data:", error);
+      }
+    }
+    setIsLoadingMeals(false);
+  };
 
   useEffect(() => {
-    const fetchMealsData = async () => {
-      if (user) {
-        try {
-          const mealLogDocRef = doc(
-            db,
-            "users",
-            user.uid,
-            "mealLogs",
-            selectedDate
-          );
-
-          let fetchedMealsData: any = {};
-          let totalCalories = 0;
-          let totalProtein = 0;
-          let totalCarbs = 0;
-          let totalFat = 0;
-
-          for (let meal of mealsList) {
-            const mealDocRef = doc(mealLogDocRef, "meals", meal);
-            const mealLogDoc = await getDoc(mealDocRef);
-
-            if (mealLogDoc.exists()) {
-              const data = mealLogDoc.data();
-              fetchedMealsData[meal] = data.items || [];
-
-              data.items.forEach((item: any) => {
-                totalCalories += item.calories;
-                totalProtein += item.protein;
-                totalCarbs += item.carbs;
-                totalFat += item.fat;
-              });
-            } else {
-              fetchedMealsData[meal] = [];
-            }
-          }
-
-          setMealsData(fetchedMealsData);
-          setTotals({
-            CAL: totalCalories,
-            PROT: totalProtein,
-            CARB: totalCarbs,
-            FAT: totalFat,
-          });
-        } catch (error) {
-          console.error("Error fetching meals data:", error);
-        }
-      }
-    };
-
     fetchMealsData();
   }, [selectedDate, user]);
 
@@ -141,9 +145,23 @@ export default function TabTwoScreen() {
     return (
       <MealDetailScreen
         meal={selectedMeal}
-        onBack={() => setSelectedMeal(null)}
+        onBack={() => {
+          setSelectedMeal(null);
+          fetchMealsData();
+          if (scrollViewRef.current) {
+            const todayIndex = dates.findIndex(
+              (date) => date.date === moment().format("YYYY-MM-DD")
+            );
+            const dateItemWidth = 85;
+            scrollViewRef.current.scrollTo({
+              x: todayIndex * dateItemWidth,
+              animated: true,
+            });
+          }
+        }}
         date={selectedDate}
         userId={user.uid}
+        onRefresh={fetchMealsData}
       />
     );
   }
@@ -155,7 +173,7 @@ export default function TabTwoScreen() {
       <Text style={[styles.nutrientText, { color: nutrientColors[nutrient] }]}>
         {nutrient}
       </Text>
-      <Text style={styles.nutrientValue}>{value}</Text>
+      <Text style={styles.nutrientValue}>{value.toFixed(0)}</Text>
     </View>
   );
 
@@ -177,7 +195,7 @@ export default function TabTwoScreen() {
             onPress={() => setSelectedDate(date.date)}
           >
             <Text style={styles.dayText}>{date.day}</Text>
-            <Text style={styles.dateText}>{date.date}</Text>
+            <Text style={styles.dateText}>{date.displayDate}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -188,63 +206,70 @@ export default function TabTwoScreen() {
           </View>
         ))}
       </View>
-      <ScrollView style={styles.mealsContainer}>
-        {mealsList.map((meal) => (
-          <View key={meal} style={styles.mealCard}>
-            <View style={styles.mealHeader}>
-              <Text style={styles.mealTitle}>{meal}</Text>
-              <TouchableOpacity onPress={() => setSelectedMeal(meal)}>
-                <Icon name="more-vert" size={24} color="#fff" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.mealItem}>
-              {mealsData[meal]
-                ?.map((item: any) => `${item.amount}g ${item.name}`)
-                .join(", ")}
-            </Text>
-            {mealsData[meal]?.length > 0 && (
-              <View style={styles.mealMacros}>
-                <Text style={[styles.macro, { backgroundColor: "#ff4d4d" }]}>
-                  {Math.round(
-                    mealsData[meal]?.reduce(
-                      (sum: number, item: any) => sum + item.calories,
-                      0
-                    ) || 0
-                  )}{" "}
-                  Cal
-                </Text>
-                <Text style={[styles.macro, { backgroundColor: "#ffcc00" }]}>
-                  {Math.round(
-                    mealsData[meal]?.reduce(
-                      (sum: number, item: any) => sum + item.protein,
-                      0
-                    ) || 0
-                  )}{" "}
-                  Prot
-                </Text>
-                <Text style={[styles.macro, { backgroundColor: "#4dff4d" }]}>
-                  {Math.round(
-                    mealsData[meal]?.reduce(
-                      (sum: number, item: any) => sum + item.carbs,
-                      0
-                    ) || 0
-                  )}{" "}
-                  Carb
-                </Text>
-                <Text style={[styles.macro, { backgroundColor: "#cc33ff" }]}>
-                  {Math.round(
-                    mealsData[meal]?.reduce(
-                      (sum: number, item: any) => sum + item.fat,
-                      0
-                    ) || 0
-                  )}{" "}
-                  Fat
-                </Text>
+      {isLoadingMeals ? (
+        <ActivityIndicator size="large" color="#3FA1CA" />
+      ) : (
+        <ScrollView
+          style={styles.mealsContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {mealsList.map((meal) => (
+            <View key={meal} style={styles.mealCard}>
+              <View style={styles.mealHeader}>
+                <Text style={styles.mealTitle}>{meal}</Text>
+                <TouchableOpacity onPress={() => setSelectedMeal(meal)}>
+                  <Icon name="add-circle" size={24} color="#fff" />
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
-        ))}
-      </ScrollView>
+              <Text style={styles.mealItem}>
+                {mealsData[meal]
+                  ?.map((item: any) => `${item.amount}g ${item.name}`)
+                  .join(", ")}
+              </Text>
+              {mealsData[meal]?.length > 0 && (
+                <View style={styles.mealMacros}>
+                  <Text style={[styles.macro, { backgroundColor: "#EE5858" }]}>
+                    {Math.round(
+                      mealsData[meal]?.reduce(
+                        (sum: number, item: any) => sum + item.calories,
+                        0
+                      ) || 0
+                    )}{" "}
+                    Cal
+                  </Text>
+                  <Text style={[styles.macro, { backgroundColor: "#72F584" }]}>
+                    {Math.round(
+                      mealsData[meal]?.reduce(
+                        (sum: number, item: any) => sum + item.protein,
+                        0
+                      ) || 0
+                    )}{" "}
+                    Prot
+                  </Text>
+                  <Text style={[styles.macro, { backgroundColor: "#F9C75C" }]}>
+                    {Math.round(
+                      mealsData[meal]?.reduce(
+                        (sum: number, item: any) => sum + item.carbs,
+                        0
+                      ) || 0
+                    )}{" "}
+                    Carb
+                  </Text>
+                  <Text style={[styles.macro, { backgroundColor: "#EE81FA" }]}>
+                    {Math.round(
+                      mealsData[meal]?.reduce(
+                        (sum: number, item: any) => sum + item.fat,
+                        0
+                      ) || 0
+                    )}{" "}
+                    Fat
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -275,6 +300,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
     width: 80,
     alignItems: "center",
+    justifyContent: "center",
   },
   selectedDate: {
     padding: 10,
@@ -283,10 +309,11 @@ const styles = StyleSheet.create({
     marginRight: 10,
     width: 80,
     alignItems: "center",
+    justifyContent: "center",
   },
   dayText: {
     color: "#fff",
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: "bold",
   },
   dateText: {
@@ -297,7 +324,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    marginVertical: 20,
   },
   nutrientCircleContainer: {
     alignItems: "center",
@@ -320,7 +346,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   mealsContainer: {
-    marginTop: 20,
+    // marginTop: 20,
   },
   mealCard: {
     backgroundColor: "#1F2831",
@@ -345,14 +371,17 @@ const styles = StyleSheet.create({
   },
   mealMacros: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     marginTop: 10,
+    gap: 6,
   },
   macro: {
     padding: 5,
-    borderRadius: 5,
-    color: "#fff",
+    borderRadius: 10,
+    color: "#1F2831",
     fontSize: 14,
+    fontWeight: "bold",
+    paddingHorizontal: 8,
   },
   errorText: {
     color: "#ff4d4d",

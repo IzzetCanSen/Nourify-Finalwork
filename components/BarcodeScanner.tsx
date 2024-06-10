@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { CameraType, useCameraPermissions, CameraView } from "expo-camera";
 import axios from "axios";
+import Icon2 from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface BarcodeScannerProps {
   onScan: (product: any) => void;
@@ -99,9 +100,11 @@ export default function BarcodeScanner({
       {loading && (
         <ActivityIndicator size="large" color="#fff" style={styles.loading} />
       )}
-      <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
-        <Text style={styles.cancelButtonText}>Cancel</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={onCancel} style={styles.cancelButton}>
+          <Icon2 name="cancel" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -120,15 +123,22 @@ const styles = StyleSheet.create({
   loading: {
     position: "absolute",
   },
-  cancelButton: {
+
+  buttonContainer: {
+    width: "22%",
     position: "absolute",
-    bottom: 50,
-    backgroundColor: "#3FA1CA",
-    padding: 15,
-    borderRadius: 10,
+    right: 8,
+    bottom: 45,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    gap: 10,
   },
-  cancelButtonText: {
-    color: "#fff",
-    fontSize: 16,
+
+  cancelButton: {
+    backgroundColor: "rgba(200, 0, 0, 0.6)",
+    padding: 10,
+    borderRadius: 50,
   },
 });

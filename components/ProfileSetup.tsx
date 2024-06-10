@@ -160,7 +160,7 @@ const ProfileSetup = () => {
           </View>
           <View style={styles.formInputsContainer}>
             <View>
-              <Text style={styles.label}>Biological sex</Text>
+              <Text style={styles.label}>Gender</Text>
               <View style={styles.radioGroup}>
                 {["Male", "Female", "Other"].map((sex) => (
                   <TouchableOpacity
