@@ -18,6 +18,7 @@ export default function TabTwoScreen() {
   const [carbs, setCarbs] = useState<string>("");
   const [fat, setFat] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,6 +102,7 @@ export default function TabTwoScreen() {
       );
 
       console.log("Form submitted");
+      setSuccess("Macros updated successfully!"); // Set success message
     }
   };
 
@@ -169,6 +171,7 @@ export default function TabTwoScreen() {
             <Text style={styles.submitButtonText}>Submit</Text>
           </TouchableOpacity>
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          {success ? <Text style={styles.success}>{success}</Text> : null}
         </View>
       </View>
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -240,20 +243,24 @@ const styles = StyleSheet.create({
   caloriesText: {
     color: "#EE5858",
     fontSize: 16,
+    fontWeight: "bold",
     marginLeft: 10,
   },
   proteinText: {
     color: "#72F584",
+    fontWeight: "bold",
     fontSize: 16,
     marginLeft: 10,
   },
   carbsText: {
     color: "#F9C75C",
+    fontWeight: "bold",
     fontSize: 16,
     marginLeft: 10,
   },
   fatText: {
     color: "#EE81FA",
+    fontWeight: "bold",
     fontSize: 16,
     marginLeft: 10,
   },
@@ -273,6 +280,10 @@ const styles = StyleSheet.create({
   },
   error: {
     color: "#d9534f",
+    marginTop: 10,
+  },
+  success: {
+    color: "#5cb85c",
     marginTop: 10,
   },
   logoutButton: {

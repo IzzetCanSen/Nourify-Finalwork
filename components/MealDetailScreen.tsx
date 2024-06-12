@@ -282,7 +282,7 @@ export default function MealDetailScreen({
               onPress={() => setScanningMeal(true)}
             >
               <Icon2 name="food-apple" size={30} color="#fff" />
-              <Text style={styles.buttonText}>Scan products</Text>
+              <Text style={styles.buttonText}>Recognize meal</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.button}

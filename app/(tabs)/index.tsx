@@ -13,6 +13,15 @@ import { auth, db } from "@/firebaseConfig";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { collection, doc, getDoc } from "firebase/firestore";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import {
+  Canvas,
+  Circle,
+  Path,
+  Skia,
+  Group,
+  translate,
+  rotate,
+} from "@shopify/react-native-skia";
 
 type NutrientKey = "CAL" | "PROT" | "CARB" | "FAT";
 
@@ -21,6 +30,13 @@ const nutrientColors: Record<NutrientKey, string> = {
   PROT: "#72F584",
   CARB: "#F9C75C",
   FAT: "#EE81FA",
+};
+
+const darkStrokeColors: Record<NutrientKey, string> = {
+  CAL: "#5E363C",
+  PROT: "#38664A",
+  CARB: "#61583E",
+  FAT: "#5E436E",
 };
 
 const mealsList = ["Breakfast", "Lunch", "Dinner", "Snack"];
@@ -35,6 +51,12 @@ export default function TabTwoScreen() {
   const [selectedMeal, setSelectedMeal] = useState<string | null>(null);
   const [mealsData, setMealsData] = useState<any>({});
   const [totals, setTotals] = useState<Record<NutrientKey, number>>({
+    CAL: 0,
+    PROT: 0,
+    CARB: 0,
+    FAT: 0,
+  });
+  const [userTargets, setUserTargets] = useState<Record<NutrientKey, number>>({
     CAL: 0,
     PROT: 0,
     CARB: 0,
@@ -70,10 +92,26 @@ export default function TabTwoScreen() {
     }
   }, [dates, selectedMeal]);
 
+  const fetchUserData = async () => {
+    if (user) {
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        return userDoc.data();
+      }
+    }
+    return null;
+  };
+
   const fetchMealsData = async () => {
     setIsLoadingMeals(true);
     if (user) {
       try {
+        const userData = await fetchUserData();
+        if (!userData) {
+          throw new Error("User data not found");
+        }
+
         const mealLogDocRef = doc(
           db,
           "users",
@@ -113,6 +151,12 @@ export default function TabTwoScreen() {
           PROT: totalProtein,
           CARB: totalCarbs,
           FAT: totalFat,
+        });
+        setUserTargets({
+          CAL: parseFloat(userData.adjustedCalories),
+          PROT: parseFloat(userData.protein),
+          CARB: parseFloat(userData.carbs),
+          FAT: parseFloat(userData.fat),
         });
       } catch (error) {
         console.error("Error fetching meals data:", error);
@@ -166,16 +210,75 @@ export default function TabTwoScreen() {
     );
   }
 
-  const renderNutrientCircle = (nutrient: NutrientKey, value: number) => (
-    <View
-      style={[styles.nutrientCircle, { borderColor: nutrientColors[nutrient] }]}
-    >
-      <Text style={[styles.nutrientText, { color: nutrientColors[nutrient] }]}>
-        {nutrient}
-      </Text>
-      <Text style={styles.nutrientValue}>{value.toFixed(0)}</Text>
-    </View>
-  );
+  const renderNutrientCircle = (
+    nutrient: NutrientKey,
+    value: number,
+    target: number
+  ) => {
+    const percentage = Math.min(value / target, 1);
+    const path = Skia.Path.Make();
+    path.addCircle(45, 45, 40); // Center the circle at (45, 45) with radius 40
+
+    return (
+      <View style={styles.nutrientCircleContainer}>
+        <Canvas style={styles.nutrientCircle}>
+          <Circle cx={45} cy={45} r={40} color={"#222E3A"} />
+          <Path
+            path={path}
+            color={darkStrokeColors[nutrient]}
+            style="stroke"
+            strokeWidth={5}
+            strokeCap="round"
+            strokeJoin="round"
+            start={0}
+            end={1}
+          />
+          <Group
+            transform={[
+              { translateX: 45 },
+              { translateY: 45 },
+              { rotate: -Math.PI / 2 },
+              { translateX: -45 },
+              { translateY: -45 },
+            ]}
+          >
+            <Path
+              path={path}
+              color={nutrientColors[nutrient]}
+              style="stroke"
+              strokeWidth={5}
+              strokeCap="round"
+              strokeJoin="round"
+              start={0}
+              end={percentage}
+            />
+          </Group>
+        </Canvas>
+        <View style={styles.nutrientTextContainer}>
+          <Text
+            style={[styles.nutrientText, { color: nutrientColors[nutrient] }]}
+          >
+            {nutrient}
+          </Text>
+          <Text
+            style={[
+              styles.nutrientValue,
+              { color: value > target ? "red" : "#fff" },
+            ]}
+          >
+            {value.toFixed(0)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const {
+    CAL: calTarget,
+    PROT: protTarget,
+    CARB: carbTarget,
+    FAT: fatTarget,
+  } = userTargets;
 
   return (
     <View style={styles.container}>
@@ -200,11 +303,10 @@ export default function TabTwoScreen() {
         ))}
       </ScrollView>
       <View style={styles.nutrientCircles}>
-        {(["CAL", "PROT", "CARB", "FAT"] as NutrientKey[]).map((nutrient) => (
-          <View key={nutrient} style={styles.nutrientCircleContainer}>
-            {renderNutrientCircle(nutrient, totals[nutrient])}
-          </View>
-        ))}
+        {renderNutrientCircle("CAL", totals.CAL, calTarget)}
+        {renderNutrientCircle("PROT", totals.PROT, protTarget)}
+        {renderNutrientCircle("CARB", totals.CARB, carbTarget)}
+        {renderNutrientCircle("FAT", totals.FAT, fatTarget)}
       </View>
       {isLoadingMeals ? (
         <ActivityIndicator size="large" color="#3FA1CA" />
@@ -326,14 +428,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   nutrientCircleContainer: {
+    position: "relative",
+    width: 90,
+    height: 90,
     alignItems: "center",
     justifyContent: "center",
   },
   nutrientCircle: {
-    width: 85,
-    height: 85,
-    borderRadius: 42.5,
-    borderWidth: 3,
+    width: 90,
+    height: 90,
+  },
+  nutrientTextContainer: {
+    position: "absolute",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -342,12 +448,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   nutrientValue: {
-    color: "#fff",
-    fontSize: 13,
+    fontSize: 12,
   },
-  mealsContainer: {
-    // marginTop: 20,
-  },
+  mealsContainer: {},
   mealCard: {
     backgroundColor: "#1F2831",
     borderRadius: 10,
