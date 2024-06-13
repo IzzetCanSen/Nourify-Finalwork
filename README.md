@@ -1,50 +1,80 @@
-# Welcome to your Expo app 👋
+# Nourify
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An intuitive app designed to make meal logging effortless, providing a seamless and user-friendly experience.
 
-## Get started
+## Introduction
 
-1. Install dependencies
+In today’s busy world, keeping track of what we eat and staying on top of our nutrition can be quite a challenge. Many people use mobile apps to help with this, but I’ve found that a lot of these apps are just too complicated and time-consuming. This frustration, combined with my interest in nutrition and fitness, inspired me to create Nourify, a mobile app that makes food logging quick and easy.
 
-   ```bash
-   npm install
-   ```
+In the app, you can log your meals using three different methods: image recognition, barcode scanning, and a search bar. Additionally, you can visualize your progress, making it easier to stay on track with your nutrition goals.
 
-2. Start the app
+## Table of Contents
 
-   ```bash
-    npx expo start
-   ```
+1. [Installation Instructions](#installation-instructions)
+2. [Usage Instructions](#usage-instructions)
+3. [Authors and Acknowledgments](#authors-and-acknowledgments)
+4. [License](#license)
+5. [Contact Information](#contact-information)
 
-In the output, you'll find options to open the app in a
+## Installation Instructions
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Prerequisites
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- Emulator or Expo Go app downloaded on a mobile device
+- Node.js version 18 or higher
+- Firebase project (free): [Firebase Console](https://console.firebase.google.com/)
+- CalorieNinjas API key (free): [CalorieNinjas](https://calorieninjas.com/)
+- Clarifai API key (free): [Clarifai](https://www.clarifai.com/)
 
-## Get a fresh project
+### Step-by-Step Guide
 
-When you're ready, run:
+1. Clone this repository
+2. Navigate to the project directory: `cd Nourify-Finalwork`
+3. Install dependencies: `npm install`
+4. Create a `.env` file in the root directory
+5. Copy and paste the environment variables from below and replace the API keys:
 
-```bash
-npm run reset-project
+```plaintext
+EXPO_PUBLIC_FIREBASE_API_KEY=[to fill]
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=[to fill]
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=[to fill]
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=[to fill]
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=[to fill]
+EXPO_PUBLIC_FIREBASE_APP_ID=[to fill]
+EXPO_PUBLIC_CALORIENINJAS_API_KEY=[to fill]
+EXPO_PUBLIC_CLARIFAI_API_KEY=[to fill]
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Dependencies
 
-## Learn more
+- React Native
+- Expo
+- Axios
+- Dotenv
+- Firebase
+- Moment
+- React Native Skia
 
-To learn more about developing your project with Expo, look at the following resources:
+## Usage Instructions
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### Launching the App
 
-## Join the community
+To start the app, run: `npx expo start`
 
-Join our community of developers creating universal apps.
+## Authors and Acknowledgments
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+### Author
+
+Izzet Sen: Developer and project lead.
+
+### Acknowledgments
+
+Thanks to Cansu Bilal for user testing the Nourify app.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
+## Contact Information
+
+For questions or support, contact Izzet Sen at [izzet.sen@student.ehb.be](mailto:izzet.sen@student.ehb.be).
